@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>JARVIS Web Amélioré</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #111; color: #0f0; padding: 20px; }
+  #log { height: 300px; overflow-y: auto; background: #000; padding: 10px; border-radius: 5px; }
+  button { padding: 10px 20px; font-size: 16px; margin-top: 20px; cursor: pointer; }
+</style>
+</head>
+<body>
+<h1>JARVIS Web Amélioré</h1>
+<div id="log"></div>
+<button id="start">Démarrer l'écoute</button>
+
+<script>
+const log = document.getElementById('log');
+const btn = document.getElementById('start');
+const userName = "Adam Dalli";
+
+function addLog(msg) {
+  log.innerHTML += `<p>${msg}</p>`;
+  log.scrollTop = log.scrollHeight;
+}
+
+function speak(text) {
+  addLog("JARVIS: " + text);
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'fr-FR';
+  speechSynthesis.speak(utter);
+}
+
+// Conjugaison basique (3eme pers. sing)
+function conjugate(verb, tense) {
+  const rad = verb.slice(0, -2);
+  if (verb.endsWith("er")) {
+    if (tense === "présent") return rad + "e";
+    if (tense === "passé") return rad + "é";
+    if (tense === "futur") return rad + "era";
+  }
+  return verb;
+}
+
+function getWeather() {
+  return fetch('https://wttr.in/Bages?format=3&lang=fr')
+    .then(res => res.text())
+    .catch(() => "Je n'ai pas pu récupérer la météo.");
+}
+
+function getTime() {
+  const now = new Date();
+  return now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function calc(expr) {
+  try {
+    return Function('"use strict";return (' + expr + ')')();
+  } catch {
+    return null;
+  }
+}
+
+function processCommand(command) {
+  command = command.toLowerCase();
+  addLog("Toi: " + command);
+
+  // heure
+  if (command.match(/heure/)) {
+    speak("Il est " + getTime());
+  }
+  // météo
+  else if (command.includes("météo")) {
+    speak("Je regarde ça...");
+    getWeather().then(weather => speak(weather));
+  }
+  // nom jarvis
+  else if (
+    command.includes("comment tu t'appelles") || 
+    command.includes("tu t'appelles comment") || 
+    command.includes("quel est ton nom")
+  ) {
+    speak("Je m'appelle JARVIS.");
+  }
+  // nom utilisateur
+  else if (
+    command.includes("comment tu m'appelles") || 
+    command.includes("quel est mon nom") || 
+    command.includes("comment je m'appelle")
+  ) {
+    speak(`Je t'appelle ${userName}.`);
+  }
+  // conjugaison
+  else if (command.startsWith("conjugue ")) {
+    const parts = command.split(" ");
+    const verb = parts[1];
+    const tense = parts[2] || "présent";
+    speak(conjugate(verb, tense));
+  }
+  // calcul
+  else if (command.startsWith("calcule ")) {
+    const expr = command.slice(7);
+    const result = calc(expr);
+    if (result !== null) speak(`Le résultat est ${result}`);
+    else speak("Je n'ai pas compris le calcul.");
+  }
+  else {
+    speak("Je ne comprends pas, répète.");
+  }
+}
+
+let recognition;
+if ('webkitSpeechRecognition' in window) {
+  recognition = new webkitSpeechRecognition();
+  recognition.lang = 'fr-FR';
+  recognition.continuous = true;  // écoute continue
+  recognition.interimResults = false;
+
+  recognition.onresult = (event) => {
+    for(let i = event.resultIndex; i < event.results.length; i++) {
+      if(event.results[i].isFinal) {
+        const text = event.results[i][0].transcript.trim();
+        processCommand(text);
+      }
+    }
+  };
+
+  recognition.onerror = (e) => {
+    speak("Je n'ai pas bien compris.");
+  };
+
+  recognition.onend = () => {
+    // relance auto écoute
+    recognition.start();
+  };
+
+} else {
+  speak("Ton navigateur ne supporte pas la reconnaissance vocale.");
+  btn.disabled = true;
+}
+
+btn.onclick = () => {
+  btn.disabled = true;
+  recognition.start();
+  speak("JARVIS est à l'écoute.");
+};
+</script>
+</body>
+</html>
